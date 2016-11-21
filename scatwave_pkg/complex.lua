@@ -72,7 +72,7 @@ function complex.multiply_complex_tensor(x,y,mini_batch_x)
    end
    y_=myTensor(y:storage(),y:storageOffset(),x:size(),strides) -- hint, set the stride to 0 when you wanna minibatch...
       
-      assert(tools.are_equal_dimension(x,y_),'Dimensions of x and y differ')      
+   assert(tools.are_equal_dimension(x,y_),'Dimensions of x and y differ')      
    local xr=x:select(x:dim(),1)
    local xi=x:select(x:dim(),2)
    local yr=y_:select(y_:dim(),1)
@@ -110,6 +110,24 @@ function complex.multiply_real_and_complex_tensor(x,y)
    return z
 end
 
+-- z = x/y, x complex, y real
+function complex.divide_real_and_complex_tensor(x,y,z)
+   assert(tools.is_complex(x),'First input must be complex')
+   assert(not tools.is_complex(y),'Second input must be real')
+   assert(tools.is_complex(z),'output z should be complex')
+   
+   local xr=x:select(x:dim(),1)
+   local xi=x:select(x:dim(),2)
+   local yr=y
+   
+   local z_real = z:select(z:dim(), 1)
+   local z_imag = z:select(z:dim(), 2)
+   
+   torch.cdiv(z_real, xr, yr)
+   torch.cdiv(z_imag, xi, yr)
+   return z
+end
+
 function complex.multiply_complex_tensor_with_real_tensor_in_place(x,y,output)
    assert(tools.is_complex(x),'First input should be complex')   
    output:narrow(output:nDimension(),1,1):cmul(x:narrow(x:nDimension(),1,1),y)
@@ -124,18 +142,18 @@ end
 
 
 function complex.periodize_in_place(x,ds,batch_size,output)
-   assert(tools.is_complex(x),'First input should be complex')   
-      
-      output:fill(0)
-   
-   for l1=1,2^ds do
-      for l2=1,2^ds do
-         --print(x:narrow(batch_size,1+(l1-1)*x:size(batch_size)/2^ds,x:size(batch_size)/2^ds):narrow(batch_size+1,1+(l2-1)*x:size(batch_size+1)/2^ds,x:size(batch_size+1)/2^ds):size())
-         output:add(x:narrow(batch_size,1+(l1-1)*x:size(batch_size)/2^ds,x:size(batch_size)/2^ds):narrow(batch_size+1,1+(l2-1)*x:size(batch_size+1)/2^ds,x:size(batch_size+1)/2^ds))
-      end
-   end
-   
-   output:div(2^(2*ds))
+	assert(tools.is_complex(x),'First input should be complex')   
+	
+	output:fill(0)
+	
+	for l1=1,2^ds do
+		for l2=1,2^ds do
+			--print(x:narrow(batch_size,1+(l1-1)*x:size(batch_size)/2^ds,x:size(batch_size)/2^ds):narrow(batch_size+1,1+(l2-1)*x:size(batch_size+1)/2^ds,x:size(batch_size+1)/2^ds):size())
+			output:add(x:narrow(batch_size,1+(l1-1)*x:size(batch_size)/2^ds,x:size(batch_size)/2^ds):narrow(batch_size+1,1+(l2-1)*x:size(batch_size+1)/2^ds,x:size(batch_size+1)/2^ds))
+		end
+	end
+	
+	output:div(2^(2*ds))
 end
 
 
@@ -159,7 +177,7 @@ function complex.multiply_complex_number_and_real_tensor(x,y)
    local z_imag = z:select(z:dim(), 2)
    
    z_real:add(xr,y) 
-      z_imag:add(xi,y)
+   z_imag:add(xi,y)
    
    return z
 end

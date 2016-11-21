@@ -49,7 +49,7 @@ end
 
 
 
-function wrapper_CUDA_fft.my_2D_fft_complex_batch(x,k,backward,out)   
+function wrapper_CUDA_fft.my_2D_fft_complex_batch(x,k,backward,out,normalize)   
    -- Defines a 2D convolution that batches until the k-th dimension
    
    local type = cuFFT.C2C
@@ -73,7 +73,7 @@ function wrapper_CUDA_fft.my_2D_fft_complex_batch(x,k,backward,out)
       
    local sign
       -- iFFT if needed, keep in mind that no normalization is performed by FFTW3.0
-   if not backward then
+   if backward==0 then
       sign = cuFFT.FORWARD
    else
       sign = cuFFT.INVERSE
@@ -97,17 +97,22 @@ function wrapper_CUDA_fft.my_2D_fft_complex_batch(x,k,backward,out)
       
 --[[--------------------------------------]]
       
-   if(backward) then
-      output:div(x:size(k)*x:size(k+1))   
+   --if(backward) then
+   local tonormalize = backward -- normalize by default for backward
+   if normalize~=nil then
+	   tonormalize = normalize
    end
+   if tonormalize==1 then
+	   output:div(x:size(k)*x:size(k+1))
+   end
+   --end
    return output
 end
 
 
 
 -- IT DESTROYS THE INPUT!(i.e. x)
-function wrapper_CUDA_fft.my_2D_ifft_complex_to_real_batch(x,k,out)
-   
+function wrapper_CUDA_fft.my_2D_ifft_complex_to_real_batch(x,k,out,normalize)
    
    local in_data = torch.data(x)
    local in_data_cast = ffi.cast(fftwf_complex_cast, in_data)
@@ -153,10 +158,12 @@ function wrapper_CUDA_fft.my_2D_ifft_complex_to_real_batch(x,k,out)
    
    cuFFT.C['cufftExecC2R'](plan_cast,in_data_cast,output_data_cast)
 --[[--------------------------------------]]
+
+   local normalize = normalize or 1
+   if normalize == 1 then
+  	   output:div(x:size(k)*x:size(k+1))   
+   end
    
-   
-   output:div(x:size(k)*x:size(k+1))   
-      
    return output
 end
 
@@ -187,7 +194,7 @@ function wrapper_CUDA_fft.my_2D_fft_complex(x,backward,out)
    
    local sign
       -- iFFT if needed, no normalization is performed by FFTW3.0
-   if not backward then
+   if backward==0 then
       sign = cuFFT.FORWARD
    else
       sign = cuFFT.INVERSE
@@ -199,14 +206,14 @@ function wrapper_CUDA_fft.my_2D_fft_complex(x,backward,out)
       cuFFT.C['cufftDestroy'](plan_cast[0])      
 --[[--------------------------------------]]
       
-   if(backward) then
+   if(backward==1) then
       output=torch.div(output,x:size(k))   
    end
    return output
 end
 
 
-function wrapper_CUDA_fft.my_2D_fft_real_batch(x,k,out)   
+function wrapper_CUDA_fft.my_2D_fft_real_batch(x,k,out,normalize)   
    local batch=x:nElement()/(x:size(k)*x:size(k+1))   
       
    if(wrapper_CUDA_fft.TMP[batch]==nil) then
@@ -221,7 +228,7 @@ function wrapper_CUDA_fft.my_2D_fft_real_batch(x,k,out)
    wrapper_CUDA_fft.TMP[batch][x:size(k)]:select(x:nDimension()+1,1):copy(x)
    
    
-   return  wrapper_CUDA_fft.my_2D_fft_complex_batch(   wrapper_CUDA_fft.TMP[batch][x:size(k)],k,nil,out) 
+   return  wrapper_CUDA_fft.my_2D_fft_complex_batch(   wrapper_CUDA_fft.TMP[batch][x:size(k)],k,0,out,normalize) -- nil
       
       -- Defines a 2D convolution that batches until the k-th dimension
 --[[

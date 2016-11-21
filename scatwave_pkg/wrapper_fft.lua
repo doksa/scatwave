@@ -16,7 +16,7 @@ local fftwf=fftw.float
 local wrapper_fft={}
 
 
-function wrapper_fft.my_2D_fft_complex_batch(x,k,backward,out)   
+function wrapper_fft.my_2D_fft_complex_batch(x,k,backward,out,normalize)   
    -- Defines a 2D convolution that batches until the k-th dimension
    local dims = ffi.new('int[?]',2)
    dims[0] = x:size(k)
@@ -39,7 +39,7 @@ function wrapper_fft.my_2D_fft_complex_batch(x,k,backward,out)
    local output_data_cast = ffi.cast(fftwf_complex_cast, output_data)
    
    -- iFFT if needed, keep in mind that no normalization is performed by FFTW3.0
-   if not backward then
+   if backward == 0 then
       sign = fftw.FORWARD
    else
       sign = fftw.BACKWARD
@@ -58,16 +58,28 @@ function wrapper_fft.my_2D_fft_complex_batch(x,k,backward,out)
    fftw.C['fftwf_execute'](plan)
    fftw.C['fftwf_destroy_plan'](plan)   
 --[[--------------------------------------]]
-      
-   if(backward) then
-      output:div(x:size(k)*x:size(k+1))   
+
+   --
+   local tonormalize = backward -- normalize by default for backward
+   if normalize~=nil then
+	   tonormalize = normalize
    end
+   if tonormalize==1 then
+	   output:div(x:size(k)*x:size(k+1))
+   end
+   --]]
+   --[[
+   local normalize = normalize or backward -- normalize by default for backward
+   if normalize==1 then
+	   output:div(x:size(k)*x:size(k+1))   
+   end
+   --]]
    return output
 end
 
 
 -- IT DESTROYS THE INPUT!(i.e. x)
-function wrapper_fft.my_2D_ifft_complex_to_real_batch(x,k,out)
+function wrapper_fft.my_2D_ifft_complex_to_real_batch(x,k,out,normalize)
 
    -- Defines a 2D convolution that batches until the k-th dimension
    local dims = ffi.new('int[?]',2)
@@ -125,9 +137,11 @@ function wrapper_fft.my_2D_ifft_complex_to_real_batch(x,k,out)
    fftw.C['fftwf_execute'](plan)
    fftw.C['fftwf_destroy_plan'](plan)  
 --[[--------------------------------------]]
-      
-      
-   output:div(x:size(k)*x:size(k+1))   
+   
+   local normalize = normalize or 1
+   if normalize == 1 then
+	   output:div(x:size(k)*x:size(k+1))   
+   end
    
    return output
 end
@@ -145,7 +159,7 @@ function wrapper_fft.my_2D_fft_complex(x,backward,out)
       output= torch.FloatTensor(x:size(),x:stride()):zero()
    else
       output=out
-end
+   end
    local output_data = torch.data(output);
    local output_data_cast = ffi.cast(fftwf_complex_cast, output_data)
    
@@ -163,15 +177,15 @@ end
    fftw.C['fftwf_execute'](plan)
    fftw.C['fftwf_destroy_plan'](plan)   
 --[[--------------------------------------]]
-      
-   if(backward) then
-      output:div(x:size(1)*x:size(2))   
+
+   if backward then
+	   output:div(x:size(1)*x:size(2))   
    end
    return output
 end
 
 
-function wrapper_fft.my_2D_fft_real_batch(x,k,out)  
+function wrapper_fft.my_2D_fft_real_batch(x,k,out,normalize)  
    -- Defines a 2D convolution that batches until the k-th dimension
    local dims = ffi.new('int[?]',2)
    dims[0] = x:size(k)
@@ -243,13 +257,17 @@ function wrapper_fft.my_2D_fft_real_batch(x,k,out)
       local subs_subs_idx=subs_idx:narrow(k,n_med,n_el)
       
       local tmp=torch.FloatTensor(subs_subs_idx:size(),subs_subs_idx:stride()) -- hard to avoid, because there are some funny memory conflicts...
-         tmp:indexCopy(k,torch.range(x:size(k)-1,1,-1):long(),subs_subs_idx)
+	  tmp:indexCopy(k,torch.range(x:size(k)-1,1,-1):long(),subs_subs_idx)
       subs_subs_idx:copy(tmp)
       
       -- conjugate         
       output:narrow(k+1,n_med_kp1,n_el_kp1):narrow(output:nDimension(),2,1):mul(-1)
    end
-   
+      
+   local normalize = normalize or 0
+   if normalize == 1 then
+	   output:div(x:size(k)*x:size(k+1))   
+   end
    
    return output
 end   

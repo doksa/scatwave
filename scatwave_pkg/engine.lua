@@ -9,7 +9,7 @@ local ffi = require 'ffi'
 local FFT = {}
 
 
-local ok, err = pcall(function () FFT.C=ffi.load('fftw3f.so.3') end)
+local ok, err = pcall(function () FFT.C=ffi.load('fftw3f') end) --'fftw3f.so.3') end)
 
 if(not ok) then
    print(err)

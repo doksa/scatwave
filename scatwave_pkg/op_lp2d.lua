@@ -5,7 +5,7 @@ local conv_lib = require 'scatwave.conv_lib'
 
 local opLP2d, parent = torch.class('scatwave.opLP2d', 'nn.Module')
 
--- input in real or complex
+-- input is real
 function opLP2d:__init(lplist,mbdim)
 	assert(mbdim == 3 and #lplist > 0) -- assume minibatch case, otherwise modify the condition in updateOutput alloc
 	parent.__init(self)

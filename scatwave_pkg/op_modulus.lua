@@ -10,7 +10,7 @@ local opModulus, parent = torch.class('scatwave.opModulus', 'nn.Module')
 function opModulus:__init(mbdim,eps)
 	parent.__init(self)
 	self.mbdim = mbdim
-	self.eps = eps or 1e-8
+	self.eps = eps or 1e-16 -- 1e-8
 	self.input_c = torch.Tensor()
 	self.output_eps = torch.Tensor()
 end
@@ -37,6 +37,7 @@ function opModulus:updateGradInput(input, gradOutput)
 		self.gradInput:resize(
 			tools.concatenateLongStorage(gradOutput:size(),torch.LongStorage({2}))):fill(0)
 		self.output_eps:resize(self.output:size()):fill(0)
+		--print('opModulus output_eps size:',self.output_eps:size())
 	end
 	self.output_eps:copy(self.output)
 	self.output_eps:add(self.eps) -- TODO use self.output instead for memory efficiency?

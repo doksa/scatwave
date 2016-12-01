@@ -10,9 +10,7 @@ local filters_bank = require 'scatwave.filters_bank'
 local conv_lib = require 'scatwave.conv_lib'
 local tools = require 'scatwave.tools'
 
-local scatwave = require 'scatwave'
 local network = torch.class('network_per')
-scatwave.network_per = network
 
 function network:__init(J,U0_dim)
 	if(J==nil) then
@@ -29,7 +27,9 @@ function network:__init(J,U0_dim)
 	
 	self.fft=require 'scatwave.wrapper_fft'         
 	self.filters=filters_bank.modify(filters_bank.morlet_filters_bank_2D(U0_dim,J,self.fft,0)) -- pad=0, no padding
-	
+end
+
+function network:alloc()
 	-- Allocate temporary variables
 	local size_multi_res=self.filters.size_multi_res   
 	--print_r(size_multi_res)
@@ -103,16 +103,21 @@ function network:get_filters()
 	return self.filters
 end
 
-function network:scat_lp(lplist)
-	local lplist = lplist or {-1,2} -- l2 norm and , -1 means computing the mean
+function network:scat_lp(lplist,uselpf)
+	local lplist = lplist -- or {-1,2} -- l2 norm and , -1 means computing the mean
 	local filters = self.filters
 	local mbdim = #self.U0_dim-1
 	local join_dim = mbdim-1 -- join at the color channel
 	local ndim = #self.U0_dim
 	local J = self.J
-
+	local uselpf = uselpf or 1
+	print('network:scat_lp #lplist,uselpf:',#lplist,uselpf)
+	local OPLP=scatwave.opLP2df
+	if uselpf == 0 then
+		OPLP=scatwave.opLP2d
+	end
 	-- 0th order
-	local opH_J = scatwave.opLP2d(lplist,mbdim)
+	local opH_J = OPLP(lplist,mbdim)
 	-- 1st order
 	local sc1a = nn.ConcatTable()
 	sc1a:add(opH_J)
@@ -123,7 +128,7 @@ function network:scat_lp(lplist)
 		local seq1b = nn.Sequential()
 		local J1=filters.psi[j1].j
 		local opG_j1 = scatwave.opConvModulusInFFT2d(filters.psi[j1].signal[1],mbdim,J1)
-		local opH_j1_J = scatwave.opLP2d(lplist,mbdim)
+		local opH_j1_J = OPLP(lplist,mbdim)
 		seq1b:add(opG_j1)
 		local sc2a = nn.ConcatTable()
 		sc2a:add(opH_j1_J)
@@ -136,7 +141,7 @@ function network:scat_lp(lplist)
 			if (J2>J1) then
 				local seq2b = nn.Sequential()
 				local opG_j2 = scatwave.opConvModulusInFFT2d(filters.psi[j2].signal[J1+1],mbdim,(J2-J1))
-				local opH_j2_J = scatwave.opLP2d(lplist,mbdim)
+				local opH_j2_J = OPLP(lplist,mbdim)
 				seq2b:add(opG_j2)
 				seq2b:add(opH_j2_J)
 				sc2b:add(seq2b)
@@ -257,6 +262,7 @@ end
 
 -- Here, we minimize the creation of memory to avoid using garbage collector
 function network:scat(U0_r,doPeriodize)
+	self:alloc()
 	--   assert(U0_r:isSize(self.U0_dim),'Not the correct specified input size') -- Does not exist with cuda tensor..
 	assert(U0_r:isContiguous(),'Input tensor is not contiguous')
 	assert(doPeriodize == nil)

@@ -45,6 +45,18 @@ function complex.abs_value(h)
    return final_h:view(final_dim)   
 end
 
+function complex.abs_value_sq(h)
+   assert(tools.is_complex(h),'The number is not complex')
+   local dim=h:size()
+   local final_dim=torch.LongStorage(#dim-1)
+   for i=1,h:nDimension()-1 do
+      final_dim[i]=dim[i]   
+   end
+   local final_h=torch.pow(h,2)
+   final_h=torch.sum(final_h,#dim)
+   return final_h:view(final_dim)   
+end
+
 function complex.realize(x)
    assert(tools.is_complex(x),'The number is not complex')
    
@@ -93,7 +105,6 @@ end
 
 
 function complex.multiply_real_and_complex_tensor(x,y)
-   
    assert(tools.is_complex(x),'First input must be complex')
    assert(not tools.is_complex(y),'Second input must be real')
    
@@ -113,7 +124,7 @@ end
 -- z = x/y, x complex, y real
 function complex.divide_real_and_complex_tensor(x,y,z)
    assert(tools.is_complex(x),'First input must be complex')
-   assert(not tools.is_complex(y),'Second input must be real')
+   --assert(not tools.is_complex(y),'Second input must be real')--CHECK
    assert(tools.is_complex(z),'output z should be complex')
    
    local xr=x:select(x:dim(),1)
